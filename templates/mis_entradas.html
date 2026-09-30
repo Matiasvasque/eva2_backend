@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titulo %}Mis entradas{% endblock %}
+{% block contenido %}
+<div class="panel-cab"><div><h1>Mis entradas</h1><p>Tus tickets y los avisos de los organizadores.</p></div>
+  <a class="btn linea" href="/mis-compras/">Mis compras y reservas</a></div>
+
+<div id="avisos" style="margin-top:24px"></div>
+
+<div class="caja" style="margin-top:20px">
+  <div class="tabla-scroll">
+  <table>
+    <thead><tr><th>Evento</th><th>Fecha y hora</th><th>Lugar</th><th>Sector</th><th>Código</th><th>Estado</th></tr></thead>
+    <tbody id="cuerpo"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+const fechaHora = iso => new Date(iso).toLocaleString("es-CL", { dateStyle: "full", timeStyle: "short" });
+
+async function cargarAvisos(){
+  const d = await api("/notificaciones/");
+  const cont = document.getElementById("avisos");
+  if (!d.results.length) { cont.innerHTML = ""; return d.results; }
+  cont.innerHTML = `
+    <div class="cab-seccion"><h3 style="margin:0;font-size:1.5rem">Avisos ${d.no_leidas ? `<span class="badge MODIFICADO">${d.no_leidas} nuevo(s)</span>` : ""}</h3>
+      ${d.no_leidas ? `<button class="btn chico linea" onclick="marcarLeidas()">Marcar como leídos</button>` : ""}</div>
+    ${d.results.map(n => `
+      <div class="notif ${n.leida ? "" : "nueva"}">
+        <h4>${esc(n.titulo)}</h4><p>${esc(n.mensaje)}</p>
+        <small>${new Date(n.creada).toLocaleString("es-CL")}</small>
+      </div>`).join("")}`;
+  return d.results;
+}
+async function marcarLeidas(){ await api("/notificaciones/", { method: "POST" }); cargarTodo(); }
+
+async function cargarTodo(){
+  const [avisos, entradas] = await Promise.all([cargarAvisos(), apiLista("/mis-entradas/")]);
+  const conAviso = new Set(avisos.filter(n => n.evento).map(n => n.evento));
+  document.getElementById("cuerpo").innerHTML = entradas.map(e => `
+    <tr>
+      <td>${esc(e.evento)} ${conAviso.has(e.evento_id) ? `<span class="badge MODIFICADO" title="El organizador cambió datos de este evento">Actualizado</span>` : ""}</td>
+      <td>${fechaHora(e.fecha)}</td>
+      <td>${esc(e.recinto)}, ${esc(e.ciudad)}</td>
+      <td>${esc(e.sector)}</td>
+      <td><code>${esc(e.codigo)}</code></td>
+      <td><span class="badge ${e.estado_orden}">${e.estado_orden}</span></td>
+    </tr>`).join("") || `<tr><td colspan="6" class="vacio">Aún no tienes entradas pagadas. Si reservaste, confirma el pago en <a href="/mis-compras/">Mis compras</a>.</td></tr>`;
+}
+cargarTodo().catch(err => { document.getElementById("cuerpo").innerHTML = `<tr><td colspan="6" class="error">${esc(mensajeError(err))}</td></tr>`; });
+</script>
+{% endblock %}

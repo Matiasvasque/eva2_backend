@@ -1,0 +1,40 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}Ticketera{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/estilo.css' %}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+</head>
+<body>
+<header class="encabezado">
+  <div class="envoltura">
+    <a class="marca" href="{% url 'landing' %}">🎸 Ticket<span>era</span></a>
+  </div>
+  <div class="envoltura barra-nav">
+    <nav class="nav">
+      <a data-si-auth data-rol="ORGANIZADOR" href="/api/docs/" target="_blank" class="docs">API Docs</a>
+      <a data-si-anon href="/login/">Iniciar sesión</a>
+      <a data-si-anon href="/registro/">Crear cuenta</a>
+      <a data-si-auth data-rol="ESPECTADOR" href="/carro/">Carro</a>
+      <a data-si-auth data-rol="ESPECTADOR" href="/mis-compras/">Mis compras</a>
+      <a data-si-auth data-rol="ESPECTADOR" href="/mis-entradas/">Mis entradas</a>
+      <a data-si-auth data-rol="ORGANIZADOR" href="/panel/">Panel</a>
+      <a data-si-auth href="#" onclick="Auth.salir()">Salir</a>
+    </nav>
+  </div>
+</header>
+
+<main class="envoltura">
+{% block contenido %}{% endblock %}
+</main>
+
+<footer class="pie">{{ ALUMNO.nombre }} · Sección {{ ALUMNO.seccion }} · {{ ALUMNO.anio }}</footer>
+<script src="{% static 'js/app.js' %}"></script>
+{% block script %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block titulo %}Evento{% endblock %}
+{% block contenido %}
+<div class="evento-hero">
+  <img id="foto" src="" alt="">
+  <div class="titulo-flotante">
+    <h1 id="titulo">Cargando…</h1>
+    <p id="meta" class="meta"></p>
+  </div>
+</div>
+
+<div class="acciones-dueno" id="acciones-dueno" style="display:none">
+  <a class="btn fantasma editar" id="btn-editar" href="#">✎ Editar evento y entradas</a>
+  <a class="btn fantasma eliminar" id="btn-eliminar" href="#">✕ Eliminar evento</a>
+</div>
+
+<p id="desc"></p>
+
+<h2>Sectores</h2>
+<table id="tabla-sectores">
+  <thead><tr><th>Sector</th><th>Precio</th><th>Disponibles</th><th>Cantidad</th><th></th></tr></thead>
+  <tbody></tbody>
+</table>
+<p id="msg" class="error"></p>
+{% endblock %}
+{% block script %}
+<script>
+const eventoId = {{ evento_id }};
+(async function(){
+  let e;
+  try { e = await api(`/eventos/${eventoId}/`); }
+  catch(err){ document.getElementById("titulo").textContent = "No se pudo cargar el evento"; document.getElementById("msg").textContent = mensajeError(err); return; }
+  document.getElementById("foto").src = e.imagen || PLACEHOLDER_EVENTO;
+  document.getElementById("titulo").textContent = e.nombre;
+  document.getElementById("meta").textContent = `${e.artista} · ${new Date(e.fecha).toLocaleString('es-CL')} · ${e.recinto_nombre}, ${e.ciudad}`;
+  document.getElementById("desc").textContent = e.descripcion || "";
+
+  // Botones "fantasma" de editar/eliminar: solo si el usuario logueado es el organizador dueño.
+  // La verificación real (autorización) la hace siempre la API; esto es solo la UI.
+  const esDueno = Auth.autenticado() && Auth.rol() === "ORGANIZADOR" && e.creado_por === Auth.usuarioId();
+  if (esDueno) {
+    document.getElementById("acciones-dueno").style.display = "flex";
+    document.getElementById("btn-editar").href = `/evento/${eventoId}/editar/`;
+    document.getElementById("btn-eliminar").href = `/evento/${eventoId}/eliminar/`;
+  }
+
+  const cuerpo = document.querySelector("#tabla-sectores tbody");
+  if (!e.sectores.length) {
+    cuerpo.innerHTML = `<tr><td colspan="5" class="vacio">${esDueno
+      ? `Este evento aún no tiene entradas a la venta. <a href="/evento/${eventoId}/editar/">Agrega zonas (Cancha, Tribuna, Palco…)</a>.`
+      : "Aún no hay entradas a la venta para este evento."}</td></tr>`;
+    return;
+  }
+  cuerpo.innerHTML = e.sectores.map(s => `
+    <tr>
+      <td>${esc(s.nombre)}</td><td class="precio">${formatearCLP(s.precio)}</td>
+      <td>${s.stock_disponible > 0 ? s.stock_disponible : "<strong>Agotado</strong>"}</td>
+      <td>${s.stock_disponible > 0 ? `<input type="number" min="1" max="${s.stock_disponible}" value="1" style="width:70px" id="cant-${s.id}">` : ""}</td>
+      <td>${s.stock_disponible > 0 ? `<button class="btn chico" data-si-auth data-rol="ESPECTADOR" onclick="agregar(${s.id})">Agregar</button>
+          <span data-si-anon>Inicia sesión para comprar</span>` : ""}</td>
+    </tr>`).join("");
+  actualizarNav();
+})();
+
+async function agregar(sectorId){
+  const cantidad = Number(document.getElementById(`cant-${sectorId}`).value || 1);
+  try {
+    await api("/carro-tickets/", { method: "POST", body: { sector: sectorId, cantidad } });
+    location.href = "/carro/";
+  } catch(err){
+    document.getElementById("msg").textContent = mensajeError(err, "No se pudo agregar al carro.");
+  }
+}
+</script>
+{% endblock %}

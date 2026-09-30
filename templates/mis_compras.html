@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block titulo %}Mis compras{% endblock %}
+{% block contenido %}
+<div class="panel-cab">
+  <div><h1>Mis compras</h1><p>Tú decides: paga tu reserva o cancélala. Las reservas sin pagar se cancelan solas a los 5 minutos.</p></div>
+  <a class="btn linea" href="/mis-entradas/">Ver mis entradas</a>
+</div>
+
+<h2 style="margin-top:30px">Pendientes de pago <span class="cuenta" id="cuenta-pend" style="font-size:1rem;color:var(--texto-sub)"></span></h2>
+<div id="pendientes"><p class="cargando-texto">Cargando…</p></div>
+
+<h2 style="margin-top:34px">Historial</h2>
+<div class="caja">
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>#</th><th>Fecha</th><th>Detalle</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="historial"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+let RELOJES = [], recargando = false;
+
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+const detalle = o => o.items.map(i => `${i.cantidad} × ${esc(i.evento)} (${esc(i.sector_nombre)})`).join("<br>");
+
+function iniciarRelojes(){
+  RELOJES.forEach(r => clearInterval(r));
+  RELOJES = [];
+  document.querySelectorAll("[data-fin]").forEach(el => {
+    const fin = Number(el.dataset.fin);
+    const tick = () => {
+      const s = Math.max(0, Math.round((fin - Date.now()) / 1000));
+      el.firstChild.textContent = mmss(s);
+      el.classList.toggle("urgente", s <= 60);
+      if (s === 0 && !recargando) { recargando = true; toast("Una reserva venció y se canceló automáticamente.", "fallo"); setTimeout(cargar, 800); }
+    };
+    tick();
+    RELOJES.push(setInterval(tick, 1000));
+  });
+}
+
+async function cargar(){
+  recargando = false;
+  const ordenes = await apiLista("/mis-compras/");
+  const pend = ordenes.filter(o => o.estado === "PENDIENTE");
+  const resto = ordenes.filter(o => o.estado !== "PENDIENTE");
+  const ahora = Date.now();
+
+  document.getElementById("cuenta-pend").textContent = pend.length ? `(${pend.length})` : "";
+  document.getElementById("pendientes").innerHTML = pend.map(o => `
+    <div class="caja compra-pend">
+      <div class="cab-seccion">
+        <h3>Orden #${o.id}</h3>
+        <div class="reloj" data-fin="${ahora + o.segundos_restantes * 1000}">--:--<small>para pagar</small></div>
+      </div>
+      <ul class="lineas">${o.items.map(i => `<li><span>${i.cantidad} × ${esc(i.evento)} — ${esc(i.sector_nombre)}</span><span>${formatearCLP(i.subtotal)}</span></li>`).join("")}</ul>
+      <div class="total-linea">
+        <strong>Total: ${formatearCLP(o.total)}</strong>
+        <div class="acciones-fila">
+          <button class="btn" onclick="pagar(${o.id}, this)">Pagar ahora</button>
+          <button class="btn peligro linea" onclick="cancelar(${o.id}, true)">Cancelar reserva</button>
+        </div>
+      </div>
+    </div>`).join("")
+    || `<div class="caja"><p class="vacio">No tienes reservas pendientes. <a href="/">Busca un evento</a>.</p></div>`;
+
+  document.getElementById("historial").innerHTML = resto.map(o => {
+    const puedeCancelar = o.estado === "PAGADO" && o.items.every(i => new Date(i.fecha) > new Date());
+    return `<tr>
+      <td>#${o.id}</td><td>${new Date(o.creada).toLocaleDateString("es-CL")}</td>
+      <td>${detalle(o)}</td><td>${formatearCLP(o.total)}</td>
+      <td><span class="badge ${o.estado}">${o.estado}</span></td>
+      <td>${puedeCancelar ? `<button class="btn chico peligro linea" onclick="cancelar(${o.id}, false)">Cancelar compra</button>` : ""}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="vacio">Aún no tienes compras.</td></tr>`;
+  iniciarRelojes();
+}
+
+async function pagar(id, btn){
+  btn.disabled = true;
+  try { await api(`/mis-compras/${id}/pagar/`, { method: "POST" }); toast("¡Pago confirmado! Tus entradas ya están disponibles."); location.href = "/mis-entradas/"; }
+  catch(err){ toast(mensajeError(err), "fallo"); cargar(); }
+}
+async function cancelar(id, esReserva){
+  if (!confirm(esReserva ? "¿Cancelar esta reserva?"
+                         : "¿Cancelar esta compra? Las entradas se anularán y volverán al stock.")) return;
+  try { await api(`/mis-compras/${id}/cancelar/`, { method: "POST" }); toast(esReserva ? "Reserva cancelada." : "Compra cancelada."); }
+  catch(err){ toast(mensajeError(err), "fallo"); }
+  cargar();
+}
+cargar().catch(err => { document.getElementById("pendientes").innerHTML = `<p class="error">${esc(mensajeError(err))}</p>`; });
+</script>
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block titulo %}Editar evento{% endblock %}
+{% block contenido %}
+<div class="panel-cab">
+  <div><h1 id="titulo-pagina">Editar evento</h1><p>Datos del evento, zonas y precios.</p></div>
+  <div class="acciones-fila">
+    <a class="btn linea" href="/panel/#eventos">← Volver al panel</a>
+    <a class="btn linea" href="/evento/{{ evento_id }}/">Ver página pública</a>
+  </div>
+</div>
+<p class="error" id="aviso" style="margin-top:20px"></p>
+
+<div id="contenido-form" style="display:none;margin-top:26px">
+
+  <div class="aviso" id="aviso-vendidas" style="display:none"></div>
+
+  <!-- ═════════ Datos del evento ═════════ -->
+  <div class="caja">
+    <div class="cab-seccion"><h3>Datos del evento</h3></div>
+    <form class="form completo" id="f" enctype="multipart/form-data">
+      <div class="form-fila">
+        <div class="campo"><label>Nombre</label><input name="nombre" id="c-nombre" required></div>
+        <div class="campo"><label>Artistas (separados por coma)</label><input name="artista" id="c-artista" placeholder="Los Tres, Chico Trujillo" required></div>
+      </div>
+      <div class="form-fila">
+        <div class="campo"><label>Fecha y hora</label><input type="datetime-local" name="fecha" id="c-fecha" required></div>
+        <div class="campo"><label>Recinto</label><select name="recinto" id="c-recinto" required></select></div>
+        <div class="campo"><label>Nueva imagen (opcional)</label><input type="file" name="imagen" id="c-imagen" accept="image/*"></div>
+      </div>
+      <div class="campo" style="margin-bottom:14px"><label>Descripción</label><textarea name="descripcion" id="c-descripcion"></textarea></div>
+      <div class="campo" style="margin-bottom:14px">
+        <label><input type="checkbox" name="activo" id="c-activo" style="width:auto"> Evento activo (visible al público)</label>
+      </div>
+      <p class="error" id="err"></p>
+      <p class="exito" id="ok"></p>
+      <div><button class="btn" type="submit">Guardar datos del evento</button></div>
+    </form>
+  </div>
+
+  <!-- ═════════ Zonas y precios ═════════ -->
+  <div class="caja">
+    <div class="cab-seccion"><h3>Zonas, precios y entradas</h3></div>
+    <p class="ayuda">Cada zona (Cancha, Tribuna, Palco…) tiene su propio precio y cantidad de entradas. Cada fila se guarda con su botón. Al cambiar la capacidad, las disponibles se ajustan solas (no puede quedar bajo lo ya vendido). Los precios nuevos no afectan a entradas ya compradas.</p>
+    <datalist id="zonas-sugeridas">
+      <option value="Cancha"><option value="Cancha VIP"><option value="Tribuna"><option value="Palco"><option value="Platea"><option value="Galería"><option value="VIP">
+    </datalist>
+    <div class="tabla-scroll">
+      <table class="tabla-edit">
+        <thead><tr><th>Zona</th><th>Precio (CLP)</th><th>Capacidad</th><th>Vendidas</th><th>Disponibles</th><th>Acciones</th></tr></thead>
+        <tbody id="zonas"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="error" id="err-zonas" style="margin-top:12px"></p>
+
+    <h4 class="zonas-titulo">Agregar una zona</h4>
+    <form class="form completo" id="f-zona">
+      <div class="form-fila">
+        <div class="campo"><label>Zona</label><input name="nombre" list="zonas-sugeridas" placeholder="Cancha, Tribuna, Palco…" required></div>
+        <div class="campo"><label>Precio (CLP)</label><input name="precio" type="number" min="1" required></div>
+        <div class="campo"><label>N° de entradas</label><input name="capacidad_total" type="number" min="1" required></div>
+      </div>
+      <p class="error" id="err-nueva"></p>
+      <div><button class="btn" type="submit">Agregar zona</button></div>
+    </form>
+  </div>
+
+  <!-- ═════════ Eliminar ═════════ -->
+  <div class="caja">
+    <div class="cab-seccion"><h3>Eliminar evento</h3></div>
+    <p class="ayuda" id="txt-eliminar">Solo puedes eliminar un evento que no tenga entradas vendidas.</p>
+    <button class="btn peligro" id="btn-eliminar">Eliminar evento</button>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+const eventoId = {{ evento_id }};
+let EVENTO = null, fechaOriginal = "";
+
+function aInputDatetime(iso){
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ───────── Carga inicial ─────────
+(async function(){
+  if (!Auth.autenticado() || Auth.rol() !== "ORGANIZADOR") { location.href = "/login/"; return; }
+  const aviso = document.getElementById("aviso");
+  try {
+    const [e, recintos] = await Promise.all([api(`/eventos/${eventoId}/`), apiLista("/recintos/")]);
+    if (e.creado_por !== Auth.usuarioId()) { aviso.textContent = "Solo el organizador que creó este evento puede editarlo."; return; }
+    EVENTO = e;
+    document.getElementById("titulo-pagina").textContent = `Editar: ${e.nombre}`;
+    document.getElementById("c-recinto").innerHTML = recintos.map(r => `<option value="${r.id}">${esc(r.nombre)} — ${esc(r.ciudad)}</option>`).join("");
+    document.getElementById("c-nombre").value = e.nombre;
+    document.getElementById("c-artista").value = e.artista;
+    document.getElementById("c-descripcion").value = e.descripcion || "";
+    fechaOriginal = aInputDatetime(e.fecha);
+    document.getElementById("c-fecha").value = fechaOriginal;
+    document.getElementById("c-recinto").value = e.recinto;
+    document.getElementById("c-activo").checked = e.activo;
+    pintarEstado(e);
+    pintarZonas(e.sectores);
+    document.getElementById("contenido-form").style.display = "";
+  } catch(err){ aviso.textContent = mensajeError(err, "No se pudo cargar el evento."); }
+})();
+
+function pintarEstado(e){
+  const av = document.getElementById("aviso-vendidas");
+  if (e.entradas_vendidas > 0) {
+    av.style.display = "";
+    av.innerHTML = `Este evento ya tiene <strong>${e.entradas_vendidas} entrada(s) vendida(s) o reservada(s)</strong>. Si cambias la <strong>fecha</strong> o el <strong>recinto</strong>, los compradores recibirán un aviso (correo y «Mis entradas») y sus tickets mostrarán los datos nuevos. No se puede eliminar; si ya no quieres mostrarlo, desmárcalo como activo.`;
+    document.getElementById("txt-eliminar").textContent = `No se puede eliminar el evento porque ya hay ${e.entradas_vendidas} entrada(s) vendida(s) o reservada(s). Puedes ocultarlo desmarcándolo como activo.`;
+  } else {
+    av.style.display = "none";
+    document.getElementById("txt-eliminar").textContent = "Este evento no tiene entradas vendidas, así que se puede eliminar. Esta acción no se puede deshacer.";
+  }
+}
+
+// ───────── Guardar datos del evento ─────────
+document.getElementById("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const err = document.getElementById("err"), ok = document.getElementById("ok");
+  err.textContent = ""; ok.textContent = "";
+  const cambioFecha = document.getElementById("c-fecha").value !== fechaOriginal;
+  const cambioRecinto = Number(document.getElementById("c-recinto").value) !== EVENTO.recinto;
+  if (EVENTO.entradas_vendidas > 0 && (cambioFecha || cambioRecinto)
+      && !confirm("Ya hay entradas vendidas. Se avisará a los compradores del cambio de " +
+                  [cambioFecha ? "fecha" : "", cambioRecinto ? "recinto" : ""].filter(Boolean).join(" y ") + ". ¿Continuar?")) return;
+  const fd = new FormData(ev.target);
+  fd.set("activo", document.getElementById("c-activo").checked ? "true" : "false");
+  if (!fd.get("imagen") || !fd.get("imagen").name) fd.delete("imagen");
+  if (!cambioFecha) fd.delete("fecha");   // fecha sin cambios: no la revalides
+  try {
+    const r = await api(`/eventos/${eventoId}/`, { method: "PATCH", body: fd, form: true });
+    EVENTO = { ...EVENTO, ...r };
+    fechaOriginal = aInputDatetime(r.fecha);
+    ok.textContent = r.notificados
+      ? `Cambios guardados. Se avisó a ${r.notificados} comprador(es) y sus entradas ya muestran los datos nuevos.`
+      : "Cambios guardados.";
+    pintarEstado(EVENTO);
+  } catch(e){
+    err.textContent = e.status === 403 ? "Solo el organizador que creó este evento puede editarlo." : mensajeError(e);
+  }
+});
+
+// ───────── Zonas ─────────
+function pintarZonas(sectores){
+  document.getElementById("zonas").innerHTML = sectores.map(s => {
+    const vendidas = s.capacidad_total - s.stock_disponible;
+    return `
+    <tr data-id="${s.id}" data-nombre="${esc(s.nombre)}" data-vendidas="${vendidas}">
+      <td><input class="z-nombre" list="zonas-sugeridas" value="${esc(s.nombre)}"></td>
+      <td><input class="z-precio" type="number" min="1" value="${Number(s.precio)}"></td>
+      <td><input class="z-cap" type="number" min="1" value="${s.capacidad_total}"></td>
+      <td>${vendidas}</td>
+      <td>${s.stock_disponible}</td>
+      <td><div class="acciones-fila">
+        <button class="btn chico" onclick="guardarZona(${s.id})">Guardar</button>
+        <button class="btn chico peligro" onclick="eliminarZona(${s.id})">Eliminar</button>
+      </div></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="vacio">Este evento aún no tiene zonas: agrégalas abajo para poner entradas a la venta.</td></tr>`;
+}
+async function recargarZonas(){
+  EVENTO = { ...EVENTO, ...(await api(`/eventos/${eventoId}/`)) };
+  pintarZonas(EVENTO.sectores); pintarEstado(EVENTO);
+}
+function textoErrorZona(err){
+  if (err && err.data && err.data.non_field_errors) return "Ya existe una zona con ese nombre en este evento.";
+  return mensajeError(err);
+}
+async function guardarZona(id){
+  const fila = document.querySelector(`#zonas tr[data-id="${id}"]`), msg = document.getElementById("err-zonas");
+  msg.textContent = "";
+  const body = {
+    nombre: fila.querySelector(".z-nombre").value.trim(),
+    precio: Number(fila.querySelector(".z-precio").value),
+    capacidad_total: Number(fila.querySelector(".z-cap").value),
+  };
+  try { await api(`/sectores/${id}/`, { method: "PATCH", body }); toast("Zona actualizada."); await recargarZonas(); }
+  catch(err){ msg.textContent = textoErrorZona(err); }
+}
+async function eliminarZona(id){
+  const fila = document.querySelector(`#zonas tr[data-id="${id}"]`), msg = document.getElementById("err-zonas");
+  msg.textContent = "";
+  const vendidas = Number(fila.dataset.vendidas);
+  if (vendidas > 0) { msg.textContent = `No se puede eliminar la zona «${fila.dataset.nombre}» porque ya hay ${vendidas} entrada(s) vendida(s).`; return; }
+  if (!confirm(`¿Eliminar la zona «${fila.dataset.nombre}»?`)) return;
+  try { await api(`/sectores/${id}/`, { method: "DELETE" }); toast("Zona eliminada."); await recargarZonas(); }
+  catch(err){ msg.textContent = mensajeError(err, "No se pudo eliminar la zona."); }
+}
+document.getElementById("f-zona").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const msg = document.getElementById("err-nueva"); msg.textContent = "";
+  const f = Object.fromEntries(new FormData(ev.target).entries());
+  const body = { evento: eventoId, nombre: f.nombre.trim(), precio: Number(f.precio), capacidad_total: Number(f.capacidad_total) };
+  try { await api("/sectores/", { method: "POST", body }); toast("Zona agregada."); ev.target.reset(); await recargarZonas(); }
+  catch(err){ msg.textContent = textoErrorZona(err); }
+});
+
+// ───────── Eliminar evento ─────────
+document.getElementById("btn-eliminar").addEventListener("click", () => {
+  if (EVENTO.entradas_vendidas > 0) {
+    toast(`No se puede eliminar el evento porque ya hay ${EVENTO.entradas_vendidas} entrada(s) vendida(s) o reservada(s).`, "fallo");
+    return;
+  }
+  location.href = `/evento/${eventoId}/eliminar/`;
+});
+</script>
+{% endblock %}

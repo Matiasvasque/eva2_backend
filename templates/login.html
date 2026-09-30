@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Iniciar sesión{% endblock %}
+{% block contenido %}
+<form class="form" id="f">
+  <h2>Iniciar sesión</h2>
+  <div class="campo"><label>Usuario</label><input name="username" required></div>
+  <div class="campo"><label>Contraseña</label><input type="password" name="password" required></div>
+  <p class="error" id="err"></p>
+  <button class="btn" type="submit">Entrar</button>
+</form>
+{% endblock %}
+{% block script %}
+<script>
+document.getElementById("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target);
+  try {
+    const data = await api("/token/", { method: "POST", body: { username: f.get("username"), password: f.get("password") } });
+    Auth.guardar(data);
+    location.href = "/";
+  } catch { document.getElementById("err").textContent = "Usuario o contraseña incorrectos."; }
+});
+</script>
+{% endblock %}

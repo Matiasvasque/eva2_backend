@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titulo %}Eliminar evento{% endblock %}
+{% block contenido %}
+<div class="form">
+  <h2>¿Eliminar este evento?</h2>
+  <p class="aviso-eliminar">Vas a eliminar <strong>{{ nombre }}</strong>. Esta acción no se puede deshacer.</p>
+  <p class="error" id="err"></p>
+  <div style="display:flex;gap:12px">
+    <button class="btn peligro" id="btn-confirmar">Sí, eliminar</button>
+    <a class="btn linea" href="/evento/{{ evento_id }}/">Cancelar</a>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+const eventoId = {{ evento_id }};
+document.getElementById("btn-confirmar").addEventListener("click", async () => {
+  try {
+    await api(`/eventos/${eventoId}/`, { method: "DELETE" });
+    location.href = "/";
+  } catch(err){
+    document.getElementById("err").textContent = err.status === 403
+      ? "Solo el organizador que creó este evento puede eliminarlo."
+      : mensajeError(err, "No se pudo eliminar el evento.");
+  }
+});
+</script>
+{% endblock %}

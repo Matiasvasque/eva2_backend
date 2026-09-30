@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Ticketera — entradas para tus próximos shows{% endblock %}
+{% block contenido %}
+<section class="hero">
+  <h1>El próximo show ya tiene entradas</h1>
+  <p>Rock, ruido y luces de neón. Encuentra tu evento y asegura tu lugar antes de que se agote.</p>
+</section>
+<h2>Próximos eventos</h2>
+<div id="lista-eventos" class="grilla">
+  <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+(async function(){
+  const cont = document.getElementById("lista-eventos");
+  try {
+    const lista = await apiLista("/eventos/?ordering=fecha");
+    cont.innerHTML = lista.map(e => `
+      <a class="tarjeta" href="/evento/${e.id}/">
+        <div class="foto-wrap"><img src="${esc(e.imagen || PLACEHOLDER_EVENTO)}" alt="${esc(e.nombre)}"></div>
+        <div class="cuerpo">
+          <h3>${esc(e.nombre)}</h3>
+          <div class="meta">${esc(e.artista)} · ${new Date(e.fecha).toLocaleDateString('es-CL')}</div>
+          <div class="meta">${esc(e.recinto_nombre)}, ${esc(e.ciudad)}</div>
+        </div>
+      </a>`).join("") || "<p>Aún no hay eventos publicados.</p>";
+  } catch (err) {
+    cont.innerHTML = `<p class="error">No se pudieron cargar los eventos: ${esc(mensajeError(err))}</p>`;
+  }
+})();
+</script>
+{% endblock %}

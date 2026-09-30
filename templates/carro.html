@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Mi carro{% endblock %}
+{% block contenido %}
+<div class="panel-cab"><div><h1>Mi carro</h1><p>Elige tus entradas y reserva: tendrás 5 minutos para confirmar el pago.</p></div></div>
+<div id="carro" style="margin-top:24px"><p class="cargando-texto">Cargando…</p></div>
+<p id="msg" class="error"></p>
+{% endblock %}
+{% block script %}
+<script>
+async function cargar(){
+  const c = await api("/carro-tickets/");
+  const cont = document.getElementById("carro");
+  if (!c.items.length){ cont.innerHTML = `<div class="caja"><p class="vacio">Tu carro está vacío. <a href="/">Mira los próximos eventos</a>.</p></div>`; return; }
+  cont.innerHTML = `
+    <div class="caja">
+      <div class="tabla-scroll"><table><thead><tr><th>Evento</th><th>Sector</th><th>Cant.</th><th>Subtotal</th><th></th></tr></thead>
+      <tbody>${c.items.map(it => `
+        <tr><td>${esc(it.evento)}</td><td>${esc(it.sector_nombre)}</td><td>${it.cantidad}</td>
+        <td>${formatearCLP(it.subtotal)}</td>
+        <td><button class="btn chico peligro" onclick="quitar(${it.sector})">Quitar</button></td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="total-linea">
+        <strong>Total: ${formatearCLP(c.total)}</strong>
+        <button class="btn" id="btn-reservar" onclick="reservar()">Reservar y continuar al pago</button>
+      </div>
+      <p class="ayuda" style="margin-top:12px">Al reservar, tienes 5 minutos para confirmar el pago. El stock se descuenta recién cuando pagas, así que conviene pagar pronto: si otra persona paga antes y ya no alcanzan las entradas, tu orden se cancela. Si no pagas en ese tiempo, la reserva se cancela sola. Tú decides si pagar o cancelar.</p>
+    </div>`;
+}
+async function quitar(sectorId){ await api(`/carro-tickets/?sector=${sectorId}`, { method: "DELETE" }); cargar(); }
+async function reservar(){
+  const btn = document.getElementById("btn-reservar"); btn.disabled = true;
+  try { await api("/mis-compras/reservar/", { method: "POST" }); location.href = "/mis-compras/"; }
+  catch(err){ document.getElementById("msg").textContent = mensajeError(err, "No se pudo reservar."); btn.disabled = false; }
+}
+cargar().catch(err => { document.getElementById("carro").innerHTML = `<p class="error">${esc(mensajeError(err))}</p>`; });
+</script>
+{% endblock %}

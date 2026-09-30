@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block titulo %}Panel del organizador{% endblock %}
+{% block contenido %}
+<div class="panel-cab">
+  <div>
+    <h1>Panel del organizador</h1>
+    <p>Crea y administra tus eventos, las zonas con sus precios, los recintos y las ventas.</p>
+  </div>
+</div>
+
+<div class="tabs" id="tabs">
+  <button class="tab activa" data-vista="resumen">Resumen</button>
+  <button class="tab" data-vista="eventos">Mis eventos <span class="cuenta" id="cuenta-eventos">0</span></button>
+  <button class="tab" data-vista="recintos">Recintos</button>
+  <button class="tab" data-vista="ventas">Ventas <span class="cuenta" id="cuenta-pend" style="display:none"></span></button>
+</div>
+
+<!-- ═════════ RESUMEN ═════════ -->
+<section class="vista activa" id="vista-resumen">
+  <div class="panel-metricas" id="metricas"></div>
+  <div class="caja">
+    <div class="cab-seccion"><h3>Últimas ventas</h3><button class="btn chico linea" onclick="mostrarVista('ventas')">Ver todas</button></div>
+    <div class="tabla-scroll">
+      <table><thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody id="ventas-resumen"><tr><td colspan="5" class="vacio">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ MIS EVENTOS ═════════ -->
+<section class="vista" id="vista-eventos">
+  <div class="cab-seccion">
+    <div><h3 style="margin:0;font-size:1.6rem">Mis eventos</h3>
+      <p class="ayuda" style="margin:2px 0 0">Edita artistas, fecha, zonas y precios. Si cambias la fecha o el recinto, los compradores reciben un aviso y sus entradas se actualizan solas.</p></div>
+    <button class="btn" id="btn-nuevo-evento">+ Nuevo evento</button>
+  </div>
+  <p class="error" id="msg-lista"></p>
+
+  <div class="caja" id="caja-nuevo" style="display:none">
+    <div class="cab-seccion"><h3>Crear evento</h3></div>
+    <form class="form completo" id="f-evento">
+      <div class="form-fila">
+        <div class="campo"><label>Nombre del evento</label><input name="nombre" required></div>
+        <div class="campo"><label>Artistas (separados por coma)</label><input name="artista" placeholder="Los Tres, Chico Trujillo" required></div>
+      </div>
+      <div class="form-fila">
+        <div class="campo"><label>Recinto</label><select name="recinto" id="c-recinto" required></select></div>
+        <div class="campo"><label>Fecha y hora</label><input name="fecha" type="datetime-local" required></div>
+        <div class="campo"><label>Imagen (opcional)</label><input name="imagen" type="file" accept="image/*"></div>
+      </div>
+      <div class="campo" style="margin-bottom:14px"><label>Descripción</label><textarea name="descripcion"></textarea></div>
+      <div class="campo" style="margin-bottom:6px"><label><input type="checkbox" name="activo" checked style="width:auto"> Evento activo (visible al público)</label></div>
+
+      <h4 class="zonas-titulo">Zonas y precios</h4>
+      <p class="ayuda">Cada zona tiene su propio precio y número de entradas. Ej.: Cancha $25.000 × 3000 · Tribuna $18.000 × 5000 · Palco $90.000 × 100.</p>
+      <datalist id="zonas-sugeridas">
+        <option value="Cancha"><option value="Cancha VIP"><option value="Tribuna"><option value="Palco"><option value="Platea"><option value="Galería"><option value="VIP">
+      </datalist>
+      <div id="filas-zonas"></div>
+      <div style="margin-bottom:16px"><button class="btn linea chico" type="button" id="btn-mas-zona">+ Agregar otra zona</button></div>
+
+      <p id="msg-evento" class="error"></p>
+      <div class="acciones-fila">
+        <button class="btn" type="submit">Crear evento</button>
+        <button class="btn linea" type="button" id="btn-cancelar-evento">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="lista-eventos-panel"><p class="vacio">Cargando…</p></div>
+</section>
+
+<!-- ═════════ RECINTOS ═════════ -->
+<section class="vista" id="vista-recintos">
+  <div class="caja">
+    <div class="cab-seccion"><h3>Recintos</h3></div>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Nombre</th><th>Ciudad</th><th>Dirección</th><th>Capacidad</th><th>Acciones</th></tr></thead>
+        <tbody id="recintos"><tr><td colspan="5" class="vacio">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="caja">
+    <div class="cab-seccion"><h3 id="titulo-recinto">Crear recinto</h3></div>
+    <form class="form completo" id="f-recinto">
+      <input type="hidden" name="rid">
+      <div class="form-fila">
+        <div class="campo"><label>Nombre</label><input name="nombre" required></div>
+        <div class="campo"><label>Dirección</label><input name="direccion" required></div>
+        <div class="campo"><label>Ciudad</label><input name="ciudad" required></div>
+        <div class="campo"><label>Capacidad</label><input name="capacidad" type="number" min="1" required></div>
+      </div>
+      <p id="msg-recinto" class="error"></p>
+      <div class="acciones-fila">
+        <button class="btn" type="submit" id="btn-recinto">Crear recinto</button>
+        <button class="btn linea" type="button" id="btn-cancelar-recinto" style="display:none">Cancelar edición</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ═════════ VENTAS ═════════ -->
+<section class="vista" id="vista-ventas">
+  <div class="caja">
+    <div class="cab-seccion"><h3>Ventas y reservas</h3></div>
+    <p class="ayuda">Solo consulta: cada espectador decide si paga o cancela su compra, así que no necesitas aprobar nada. Las reservas pendientes aún no descuentan stock (se descuenta al pagar) y se cancelan solas a los 5 minutos si no se pagan.</p>
+    <div class="chips" id="filtro-ventas" style="margin:0 0 14px">
+      <button class="chip activa" data-f="TODAS" onclick="filtrarVentas('TODAS')">Todas</button>
+      <button class="chip" data-f="PENDIENTE" onclick="filtrarVentas('PENDIENTE')">Pendientes</button>
+      <button class="chip" data-f="PAGADO" onclick="filtrarVentas('PAGADO')">Pagadas</button>
+      <button class="chip" data-f="CANCELADO" onclick="filtrarVentas('CANCELADO')">Canceladas</button>
+    </div>
+    <div class="tabla-scroll">
+      <table><thead><tr><th>#</th><th>Cliente</th><th>Detalle</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody id="ventas"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block script %}
+<script>
+if (!Auth.autenticado() || Auth.rol() !== "ORGANIZADOR") { location.href = "/login/"; }
+
+let RECINTOS = [], EVENTOS = [], ORDENES = [];
+const fechaHora = iso => new Date(iso).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" });
+
+// ───────── Pestañas ─────────
+function mostrarVista(nombre){
+  if (!document.getElementById(`vista-${nombre}`)) nombre = "resumen";
+  document.querySelectorAll(".vista").forEach(v => v.classList.toggle("activa", v.id === `vista-${nombre}`));
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("activa", t.dataset.vista === nombre));
+  history.replaceState(null, "", `#${nombre}`);
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => mostrarVista(t.dataset.vista)));
+
+// ───────── Resumen y ventas ─────────
+async function cargarMetricas(){
+  const m = await api("/metricas/");
+  document.getElementById("metricas").innerHTML = `
+    <div class="metrica"><div class="num">${m.eventos}</div><div class="etq">Eventos</div></div>
+    <div class="metrica"><div class="num">${m.recintos}</div><div class="etq">Recintos</div></div>
+    <div class="metrica"><div class="num">${m.entradas_vendidas}</div><div class="etq">Entradas vendidas</div></div>
+    <div class="metrica"><div class="num">${m.pendientes}</div><div class="etq">Reservas pendientes</div></div>
+    <div class="metrica"><div class="num">${formatearCLP(m.ingresos)}</div><div class="etq">Ingresos</div></div>`;
+}
+let FILTRO_VENTAS = "TODAS";
+function filtrarVentas(f){ FILTRO_VENTAS = f; pintarVentas(); }
+const detalleOrden = o => o.items.map(i => `${i.cantidad} × ${esc(i.evento)} (${esc(i.sector_nombre)})`).join("<br>");
+const estadoOrden = o => `<span class="badge ${o.estado}">${o.estado}</span>` +
+  (o.estado === "PENDIENTE" ? `<div class="meta" style="font-size:.75rem;color:var(--texto-sub)">vence en ${Math.ceil(o.segundos_restantes / 60)} min</div>` : "");
+
+function pintarVentas(){
+  document.querySelectorAll("#filtro-ventas .chip").forEach(c => c.classList.toggle("activa", c.dataset.f === FILTRO_VENTAS));
+  const lista = ORDENES.filter(o => FILTRO_VENTAS === "TODAS" || o.estado === FILTRO_VENTAS);
+  document.getElementById("ventas").innerHTML = lista.map(o => `
+    <tr><td>#${o.id}</td><td>${esc(o.usuario_nombre)}</td><td>${detalleOrden(o)}</td>
+    <td>${formatearCLP(o.total)}</td><td>${estadoOrden(o)}</td>
+    <td>${new Date(o.creada).toLocaleDateString("es-CL")}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="vacio">No hay compras en esta categoría.</td></tr>`;
+  document.getElementById("ventas-resumen").innerHTML = ORDENES.slice(0, 5).map(o => `
+    <tr><td>#${o.id}</td><td>${esc(o.usuario_nombre)}</td><td>${formatearCLP(o.total)}</td>
+    <td>${estadoOrden(o)}</td><td>${new Date(o.creada).toLocaleDateString("es-CL")}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="vacio">Sin ventas aún.</td></tr>`;
+  const pend = ORDENES.filter(o => o.estado === "PENDIENTE").length, c = document.getElementById("cuenta-pend");
+  c.textContent = pend; c.style.display = pend ? "" : "none";
+}
+async function cargarVentas(){
+  ORDENES = await api("/compras/");
+  pintarVentas();
+}
+
+// ───────── Mis eventos ─────────
+async function cargarMisEventos(){
+  const cont = document.getElementById("lista-eventos-panel");
+  try {
+    EVENTOS = await apiLista(`/eventos/?creado_por=${Auth.usuarioId()}&ordering=fecha`);
+  } catch(err){ cont.innerHTML = `<p class="error">${esc(mensajeError(err))}</p>`; return; }
+  document.getElementById("cuenta-eventos").textContent = EVENTOS.length;
+  cont.innerHTML = EVENTOS.map(e => {
+    const total = e.sectores.reduce((a, s) => a + s.capacidad_total, 0);
+    const disp = e.sectores.reduce((a, s) => a + s.stock_disponible, 0);
+    const pct = total ? Math.round(((total - disp) / total) * 100) : 0;
+    const zonas = e.sectores.length
+      ? e.sectores.map(s => `<span class="chip ${s.stock_disponible === 0 ? "agotado" : ""}">${esc(s.nombre)} · <b>${formatearCLP(s.precio)}</b> · ${s.stock_disponible}/${s.capacidad_total}</span>`).join("")
+      : `<span class="chip agotado">Sin zonas: agrégalas en Editar para vender entradas</span>`;
+    return `
+    <article class="ev-card">
+      <img src="${esc(e.imagen || PLACEHOLDER_EVENTO)}" alt="">
+      <div>
+        <h3>${esc(e.nombre)} <span class="badge ${e.activo ? "ACTIVO" : "OCULTO"}">${e.activo ? "Activo" : "Oculto"}</span></h3>
+        <div class="meta">${esc(e.artista)}</div>
+        <div class="meta">${fechaHora(e.fecha)} · ${esc(e.recinto_nombre)}, ${esc(e.ciudad)}</div>
+        <div class="barra" title="${pct}% vendido"><span style="width:${pct}%"></span></div>
+        <div class="meta">${e.entradas_vendidas} vendidas o reservadas · ${disp} disponibles de ${total}</div>
+        <div class="chips">${zonas}</div>
+      </div>
+      <div class="ev-acciones">
+        <a class="btn chico" href="/evento/${e.id}/editar/">Editar</a>
+        <a class="btn chico linea" href="/evento/${e.id}/">Ver página</a>
+        <button class="btn chico linea" onclick="alternarActivo(${e.id})">${e.activo ? "Ocultar" : "Publicar"}</button>
+        <button class="btn chico peligro" onclick="eliminarEvento(${e.id})">Eliminar</button>
+      </div>
+    </article>`;
+  }).join("") || `<div class="caja"><p class="vacio">Aún no has creado eventos. Usa «+ Nuevo evento».</p></div>`;
+}
+async function alternarActivo(id){
+  const e = EVENTOS.find(x => x.id === id);
+  try { await api(`/eventos/${id}/`, { method: "PATCH", body: { activo: !e.activo } });
+        toast(e.activo ? "Evento oculto del público." : "Evento publicado."); cargarMisEventos(); }
+  catch(err){ toast(mensajeError(err), "fallo"); }
+}
+async function eliminarEvento(id){
+  const e = EVENTOS.find(x => x.id === id);
+  if (e.entradas_vendidas > 0) {
+    toast(`No se puede eliminar «${e.nombre}» porque ya hay ${e.entradas_vendidas} entrada(s) vendida(s) o reservada(s). Puedes ocultarlo con el botón «Ocultar».`, "fallo");
+    return;
+  }
+  if (!confirm(`¿Eliminar «${e.nombre}»? Esta acción no se puede deshacer.`)) return;
+  try { await api(`/eventos/${id}/`, { method: "DELETE" }); toast("Evento eliminado."); cargarMisEventos(); cargarMetricas(); }
+  catch(err){ toast(mensajeError(err, "No se pudo eliminar el evento."), "fallo"); cargarMisEventos(); }
+}
+
+// ───────── Formulario "Nuevo evento" ─────────
+const cajaNuevo = document.getElementById("caja-nuevo");
+document.getElementById("btn-nuevo-evento").addEventListener("click", () => {
+  cajaNuevo.style.display = cajaNuevo.style.display === "none" ? "" : "none";
+  if (cajaNuevo.style.display === "") cajaNuevo.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("btn-cancelar-evento").addEventListener("click", () => { cajaNuevo.style.display = "none"; });
+
+function agregarFilaZona(nombre = "", precio = "", cap = ""){
+  const fila = document.createElement("div");
+  fila.className = "fila-zona";
+  fila.innerHTML = `
+    <div class="campo"><label>Zona</label><input class="z-nombre" list="zonas-sugeridas" placeholder="Cancha, Tribuna, Palco…" value="${esc(nombre)}"></div>
+    <div class="campo"><label>Precio (CLP)</label><input class="z-precio" type="number" min="1" value="${esc(precio)}"></div>
+    <div class="campo"><label>N° de entradas</label><input class="z-cap" type="number" min="1" value="${esc(cap)}"></div>
+    <button type="button" class="btn chico peligro" title="Quitar zona">✕</button>`;
+  fila.querySelector("button").addEventListener("click", () => fila.remove());
+  document.getElementById("filas-zonas").appendChild(fila);
+}
+function zonasIniciales(){ document.getElementById("filas-zonas").innerHTML = ""; agregarFilaZona("Cancha"); agregarFilaZona("Tribuna"); agregarFilaZona("Palco"); }
+document.getElementById("btn-mas-zona").addEventListener("click", () => agregarFilaZona());
+zonasIniciales();
+
+document.getElementById("f-evento").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const form = ev.target, msg = document.getElementById("msg-evento");
+  msg.className = "error"; msg.textContent = "";
+
+  const zonas = [];
+  for (const fila of document.querySelectorAll("#filas-zonas .fila-zona")) {
+    const nombre = fila.querySelector(".z-nombre").value.trim();
+    const precio = fila.querySelector(".z-precio").value;
+    const cap = fila.querySelector(".z-cap").value;
+    if (!nombre && !precio && !cap) continue;
+    if (!nombre || !precio || !cap) { msg.textContent = "Cada zona necesita nombre, precio y número de entradas."; return; }
+    zonas.push({ nombre, precio: Number(precio), capacidad_total: Number(cap) });
+  }
+  if (new Set(zonas.map(z => z.nombre.toLowerCase())).size !== zonas.length) { msg.textContent = "No puedes repetir el nombre de una zona."; return; }
+
+  const fd = new FormData(form);
+  fd.set("activo", form.activo.checked ? "true" : "false");
+  if (!fd.get("imagen") || !fd.get("imagen").name) fd.delete("imagen");
+  let evento;
+  try { evento = await api("/eventos/", { method: "POST", body: fd, form: true }); }
+  catch(err){ msg.textContent = mensajeError(err); return; }
+
+  const fallos = [];
+  for (const z of zonas) {
+    try { await api("/sectores/", { method: "POST", body: { evento: evento.id, ...z } }); }
+    catch(err){ fallos.push(`${z.nombre}: ${mensajeError(err)}`); }
+  }
+  if (fallos.length) {
+    msg.innerHTML = `El evento se creó, pero fallaron algunas zonas: ${esc(fallos.join(" | "))}. <a href="/evento/${evento.id}/editar/">Corrígelas aquí</a>.`;
+  } else {
+    toast("Evento creado con sus zonas.");
+    form.reset(); zonasIniciales(); cajaNuevo.style.display = "none";
+  }
+  cargarMisEventos(); cargarMetricas();
+});
+
+// ───────── Recintos ─────────
+async function cargarRecintos(){
+  RECINTOS = await apiLista("/recintos/");
+  document.getElementById("c-recinto").innerHTML = RECINTOS.length
+    ? RECINTOS.map(r => `<option value="${r.id}">${esc(r.nombre)} — ${esc(r.ciudad)} (cap. ${r.capacidad})</option>`).join("")
+    : `<option value="">Primero crea un recinto (pestaña Recintos)</option>`;
+  document.getElementById("recintos").innerHTML = RECINTOS.map(r => `
+    <tr><td>${esc(r.nombre)}</td><td>${esc(r.ciudad)}</td><td>${esc(r.direccion)}</td><td>${r.capacidad}</td>
+    <td><div class="acciones-fila">
+      <button class="btn chico" onclick="editarRecinto(${r.id})">Editar</button>
+      <button class="btn chico peligro" onclick="eliminarRecinto(${r.id})">Eliminar</button>
+    </div></td></tr>`).join("") || `<tr><td colspan="5" class="vacio">No hay recintos todavía.</td></tr>`;
+}
+function editarRecinto(id){
+  const r = RECINTOS.find(x => x.id === id), f = document.getElementById("f-recinto");
+  f.rid.value = r.id; f.nombre.value = r.nombre; f.direccion.value = r.direccion; f.ciudad.value = r.ciudad; f.capacidad.value = r.capacidad;
+  document.getElementById("titulo-recinto").textContent = `Editar recinto: ${r.nombre}`;
+  document.getElementById("btn-recinto").textContent = "Guardar cambios";
+  document.getElementById("btn-cancelar-recinto").style.display = "";
+  f.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function salirEdicionRecinto(){
+  const f = document.getElementById("f-recinto"); f.reset(); f.rid.value = "";
+  document.getElementById("titulo-recinto").textContent = "Crear recinto";
+  document.getElementById("btn-recinto").textContent = "Crear recinto";
+  document.getElementById("btn-cancelar-recinto").style.display = "none";
+  document.getElementById("msg-recinto").textContent = "";
+}
+async function eliminarRecinto(id){
+  const r = RECINTOS.find(x => x.id === id);
+  if (!confirm(`¿Eliminar el recinto «${r.nombre}»?`)) return;
+  try { await api(`/recintos/${id}/`, { method: "DELETE" }); toast("Recinto eliminado."); await cargarRecintos(); }
+  catch(err){ toast(mensajeError(err, "No se pudo eliminar el recinto."), "fallo"); }
+}
+document.getElementById("btn-cancelar-recinto").addEventListener("click", salirEdicionRecinto);
+document.getElementById("f-recinto").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const msg = document.getElementById("msg-recinto"); msg.textContent = "";
+  const { rid: id, ...body } = Object.fromEntries(new FormData(ev.target).entries());
+  try {
+    if (id) await api(`/recintos/${id}/`, { method: "PATCH", body });
+    else await api("/recintos/", { method: "POST", body });
+    toast(id ? "Recinto actualizado." : "Recinto creado.");
+    salirEdicionRecinto(); await cargarRecintos(); cargarMetricas();
+  } catch(err){ msg.textContent = mensajeError(err); }
+});
+
+mostrarVista((location.hash || "#resumen").slice(1));
+cargarMetricas(); cargarVentas(); cargarRecintos(); cargarMisEventos();
+// Las reservas vencen solas: se refresca el panel cada 30 s para ver ventas, pendientes y stock al día.
+setInterval(() => { cargarMetricas(); cargarVentas(); cargarMisEventos(); }, 30000);
+</script>
+{% endblock %}

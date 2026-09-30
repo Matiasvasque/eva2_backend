@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titulo %}Crear cuenta{% endblock %}
+{% block contenido %}
+<form class="form" id="f">
+  <h2>Crear cuenta</h2>
+  <div class="campo"><label>Usuario</label><input name="username" required></div>
+  <div class="campo"><label>Email</label><input type="email" name="email" required></div>
+  <div class="campo"><label>RUT (ej. 12345678-5)</label><input name="rut"></div>
+  <div class="campo"><label>Contraseña</label><input type="password" name="password" required minlength="6"></div>
+  <div class="campo">
+    <label>Tipo de cuenta</label>
+    <select name="rol">
+      <option value="ESPECTADOR">Espectador (compro entradas)</option>
+      <option value="ORGANIZADOR">Organizador (publico eventos)</option>
+    </select>
+  </div>
+  <p class="error" id="err"></p>
+  <button class="btn" type="submit">Registrarme</button>
+</form>
+{% endblock %}
+{% block script %}
+<script>
+document.getElementById("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target);
+  const body = Object.fromEntries(f.entries());
+  try {
+    await api("/registro/", { method: "POST", body });
+    const data = await api("/token/", { method: "POST", body: { username: body.username, password: body.password } });
+    Auth.guardar(data);
+    location.href = "/";
+  } catch(err){ document.getElementById("err").textContent = formatearError(err.data); }
+});
+</script>
+{% endblock %}
